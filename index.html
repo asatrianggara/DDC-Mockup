@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DDC — Tiga Alur Khusus</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+ :root{color-scheme:light}
+ .hidden{display:none!important}
+ body{font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;background:#f1f5f9;color:#1e293b}
+ input,select,textarea{background:#fff!important;color:#0f172a!important;border-color:#cbd5e1}
+ input::placeholder{color:#94a3b8}
+ input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+ input[type=number]{-moz-appearance:textfield}
+ @media print{body *{visibility:hidden}#printArea,#printArea *{visibility:visible}
+  #printArea{position:absolute;left:0;top:0;width:100%}.no-print{display:none!important}}
+</style>
+</head>
+<body>
+
+<div class="bg-slate-900 text-slate-300 text-xs no-print">
+  <div class="max-w-7xl mx-auto px-6 py-2 flex flex-wrap items-center gap-3">
+    <span class="font-bold tracking-widest text-slate-500">TAMPILAN PENINJAUAN · PILIH PERAN</span>
+    <div id="swPeran" class="flex gap-1"></div>
+    <span id="catatPeran" class="ml-auto text-slate-500"></span>
+  </div>
+</div>
+
+<header class="bg-white border-b border-slate-200 no-print">
+  <div class="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between gap-3">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-lg bg-teal-700 text-white grid place-items-center font-bold text-sm">DDC</div>
+      <div><div class="font-semibold leading-tight">Toko Fashion DDC</div>
+        <div class="text-xs text-slate-500 leading-tight">Pratinjau tiga alur khusus</div></div>
+    </div>
+    <div class="text-xs text-slate-500 text-right leading-tight">
+      <div id="namaUser" class="font-medium text-slate-700"></div><div>Gudang 1 — Manado</div></div>
+  </div>
+  <div class="max-w-7xl mx-auto px-6 pt-1">
+    <nav id="alur" class="flex gap-2 pb-2 text-sm overflow-x-auto"></nav>
+  </div>
+  <div class="max-w-7xl mx-auto px-6 bg-slate-50 border-t border-slate-200">
+    <nav id="tabs" class="flex gap-1 -mb-px text-sm overflow-x-auto"></nav>
+  </div>
+</header>
+
+<main class="max-w-7xl mx-auto px-6 py-6">
+  <div id="isi"></div>
+</main>
+
+<!-- ============ MODAL ============ -->
+<div id="modal" class="fixed inset-0 bg-slate-900/50 z-50 hidden overflow-y-auto no-print p-4">
+  <div class="max-w-4xl mx-auto my-6 bg-white rounded-xl shadow-xl">
+    <div class="px-5 py-4 border-b border-slate-200 flex items-center justify-between gap-3">
+      <div><h2 id="mJudul" class="font-semibold"></h2><p id="mSub" class="text-xs text-slate-500"></p></div>
+      <button onclick="tutup()" class="text-slate-400 hover:text-slate-700 text-2xl leading-none">&times;</button>
+    </div>
+    <div id="mIsi" class="p-5"></div>
+  </div>
+</div>
+
+<script>
+/* ============ DATA ============ */
+let WARNA=['Hitam','Putih','Navy','Maroon','Baby Blue','Mocca','Olive','Dusty Pink'];
+const UKURAN=['M','L','XL','XXL'];
+const rp=n=>'Rp '+Number(n||0).toLocaleString('id-ID');
+const BADGE={'Draf':'bg-slate-100 text-slate-600','Menunggu verifikasi':'bg-sky-100 text-sky-700',
+ 'Menunggu HPP':'bg-amber-100 text-amber-700','Terkunci':'bg-emerald-100 text-emerald-700'};
+const pill=s=>`<span class="px-2 py-0.5 rounded-full text-xs font-semibold ${BADGE[s]}">${s}</span>`;
+const PERAN={gudang:'Dina · Admin Gudang',owner:'Pak Rolan · Owner',
+ jual:'Rina · Admin Penjualan',kasir:'Sari · Kasir Toko'};
+const S={peran:'gudang',batch:[
+ {id:'BM-0912',kode:'BL-07',nama:'Blouse Katun Rayon',tgl:'5 Okt 2026, 09.12',oleh:'Dina',
+  status:'Menunggu HPP',jual:98000,hpp:null,terjual:2,pernahKunci:false,terhitung:0,
+  baris:[{w:'Mocca',u:'M',q:9},{w:'Mocca',u:'L',q:6},{w:'Baby Blue',u:'M',q:4}]},
+ {id:'BM-0845',kode:'KM-02',nama:'Kemeja Flanel Kotak',tgl:'5 Okt 2026, 08.45',oleh:'Dina',
+  status:'Menunggu verifikasi',jual:145000,hpp:null,terjual:0,
+  baris:[{w:'Maroon',u:'L',q:8},{w:'Maroon',u:'XL',q:6},{w:'Navy',u:'L',q:7}]},
+ {id:'BM-0830',kode:'KM-01',nama:'Kemeja Polos Lengan Panjang',tgl:'4 Okt 2026, 08.30',oleh:'Dina',
+  status:'Terkunci',jual:125000,hpp:72000,terjual:6,pernahKunci:true,terhitung:6,
+  baris:[{w:'Navy',u:'L',q:14},{w:'Navy',u:'XL',q:10},{w:'Hitam',u:'L',q:6}]},
+ {id:'BM-0820',kode:'BL-05',nama:'Blouse Lengan Balon',tgl:'5 Okt 2026, 08.20',oleh:'Dina',
+  status:'Draf',jual:0,hpp:null,terjual:0,baris:[{w:'Putih',u:'M',q:5}]}]};
+const jml=b=>b.baris.reduce((a,x)=>a+x.q,0);
+S.stok=[
+ {kode:'KM-01',nama:'Kemeja Polos Lengan Panjang',w:'Navy',u:'L',fisik:12,jual:125000},
+ {kode:'KM-01',nama:'Kemeja Polos Lengan Panjang',w:'Navy',u:'XL',fisik:8,jual:125000},
+ {kode:'KM-01',nama:'Kemeja Polos Lengan Panjang',w:'Hitam',u:'L',fisik:5,jual:125000},
+ {kode:'BL-07',nama:'Blouse Katun Rayon',w:'Mocca',u:'M',fisik:9,jual:98000},
+ {kode:'BL-07',nama:'Blouse Katun Rayon',w:'Mocca',u:'L',fisik:6,jual:98000},
+ {kode:'BL-07',nama:'Blouse Katun Rayon',w:'Baby Blue',u:'M',fisik:4,jual:98000}];
+S.keep=[
+ {id:'K-01',kode:'KM-01',w:'Navy',u:'L',q:3,admin:'Rina · Admin IG',pel:'Bu Ani',jenis:'Umum',
+  dp:100000,ref:'BCA/2410/88123',bukti:'bukti-bca-88123.jpg',lepas:'6 Okt 2026, 14.02'},
+ {id:'K-02',kode:'BL-07',w:'Mocca',u:'M',q:4,admin:'Tono · Admin Live',pel:'Toko Melati',jenis:'Reseller',
+  dp:200000,ref:'BRI/2410/55120',bukti:'bukti-bri-55120.jpg',lepas:'6 Okt 2026, 10.40'}];
+S.kas={awal:500000,admin:[
+ {nama:'Rina · Admin IG',tunai:0,bri:0,bca:375000,qris:0,ongkir:20000},
+ {nama:'Tono · Admin Live',tunai:0,bri:328000,bca:0,qris:0,ongkir:25000},
+ {nama:'Sari · Kasir Toko',tunai:1250000,bri:0,bca:0,qris:430000,ongkir:0}],
+ keluar:[
+  {jam:'15.20',jenis:'Ongkos kirim',ket:'Gojek ke Bu Ani',atas:'Rina · Admin IG',bukti:'foto-ongkir-01.jpg',n:20000},
+  {jam:'14.05',jenis:'Ongkos kirim',ket:'Gojek ke Toko Melati',atas:'Tono · Admin Live',bukti:'foto-ongkir-02.jpg',n:25000}]};
+const diKeep=(k,w,u)=>S.keep.filter(x=>x.kode===k&&x.w===w&&x.u===u).reduce((a,b)=>a+b.q,0);
+const bisa={verifikasi:['owner'],hpp:['owner'],barcode:['gudang','owner'],masuk:['gudang','owner'],
+ stok:['jual','owner','kasir','gudang'],keep:['jual','owner','kasir'],dp:['jual','owner','kasir'],
+ keluar:['kasir','owner'],tutup:['kasir','owner']};
+const ALUR=[
+ {k:'A',l:'Alur 1 · Stok Masuk & HPP',tab:[['masuk','Catat Barang Masuk'],['verifikasi','Verifikasi'],
+   ['hpp','Pengisian HPP'],['barcode','Cetak Barcode']]},
+ {k:'B',l:'Alur 2 · Keep Stok & DP',tab:[['stok','Stok Tersedia'],['keep','Keep Berjalan'],['dp','DP & Pembatalan']]},
+ {k:'C',l:'Alur 3 · Tutup Hari',tab:[['keluar','Pengeluaran Kas'],['tutup','Rekap & Tutup Hari']]}];
+let alur='A', tab='masuk', draf=null, fHpp='Menunggu HPP';
+
+/* ============ KOMPONEN ============ */
+const btn=(t,aksi,gaya='pri',kecil=true)=>{
+ const g={pri:'bg-teal-700 text-white hover:bg-teal-800 border-teal-700',
+  gh:'bg-white text-slate-700 hover:border-teal-600 hover:text-teal-700 border-slate-300',
+  dg:'bg-white text-rose-600 hover:bg-rose-50 border-rose-200'}[gaya];
+ return `<button onclick="${aksi}" class="${kecil?'px-3 py-1.5 text-xs':'px-4 py-2 text-sm'} rounded-lg border font-semibold ${g}">${t}</button>`;}
+const tabel=(kol,rows,kosong)=>`<div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
+ <div class="overflow-x-auto"><table class="w-full text-sm">
+ <thead class="bg-slate-50 text-xs uppercase text-slate-500"><tr>
+  ${kol.map(k=>`<th class="px-4 py-2.5 ${k.a==='c'?'text-center':k.a==='r'?'text-right':'text-left'}">${k.t}</th>`).join('')}
+ </tr></thead><tbody>
+ ${rows.length?rows.map(r=>`<tr class="border-t border-slate-100 hover:bg-slate-50">
+   ${r.map((c,i)=>`<td class="px-4 py-3 ${kol[i].a==='c'?'text-center':kol[i].a==='r'?'text-right':''}">${c}</td>`).join('')}
+  </tr>`).join('')
+ :`<tr><td colspan="${kol.length}" class="px-4 py-12 text-center text-slate-400 text-sm">${kosong||'Belum ada data.'}</td></tr>`}
+ </tbody></table></div></div>`;
+const judul=(h,p,kanan)=>`<div class="flex flex-wrap items-end justify-between gap-3 mb-4">
+ <div><h1 class="text-xl font-semibold">${h}</h1><p class="text-sm text-slate-500 mt-0.5 max-w-3xl">${p}</p></div>
+ <div class="flex gap-2">${kanan||''}</div></div>`;
+const info=(t,warna='teal')=>`<div class="bg-${warna}-50 border border-${warna}-200 rounded-lg px-4 py-2.5 text-xs text-${warna}-800 mt-3">${t}</div>`;
+
+/* ============ TAB 1 ============ */
+function vMasuk(){
+ const boleh=S.peran==='gudang'||S.peran==='owner';
+ const rows=S.batch.map(b=>[
+  `<div class="font-semibold">${b.id}</div><div class="text-xs text-slate-500">${b.tgl}</div>`,
+  `${b.nama}<div class="text-xs text-slate-500">${b.kode} · oleh ${b.oleh}</div>`,
+  b.baris.length, `<b>${jml(b)}</b>`, b.jual?rp(b.jual):'—',
+  b.hpp?rp(b.hpp):'<span class="text-xs text-amber-600 font-semibold">belum</span>',
+  pill(b.status),
+  [b.status==='Draf'&&S.peran==='gudang'?btn('Lanjutkan',`lanjutDraf('${b.id}')`,'gh'):'',
+   btn('Lihat',`lihat('${b.id}')`,'gh')].filter(Boolean).join(' ')]);
+ document.getElementById('isi').innerHTML=
+  judul('Catat Barang Masuk',
+   'Dibuat admin gudang saat karung dibongkar. Berstatus <b>Draf</b> selama masih bisa diubah, lalu dikirim untuk diperiksa. <b class="text-teal-700">HPP tidak diisi di sini.</b>',
+   boleh?btn('+ Catat barang masuk','buatBaru()','pri',false):'')
+  +`<div class="bg-white rounded-xl border border-slate-200 mb-3 px-4 py-3 flex flex-wrap gap-2">
+     <input id="cari" oninput="render()" placeholder="Cari nomor atau produk" class="px-3 py-1.5 rounded-lg border text-sm w-56">
+     <select id="filter" onchange="render()" class="px-3 py-1.5 rounded-lg border text-sm">
+      <option>Semua status</option>${Object.keys(BADGE).map(s=>`<option>${s}</option>`).join('')}</select></div>`
+  +tabel([{t:'Nomor'},{t:'Produk'},{t:'Varian',a:'c'},{t:'Jumlah',a:'c'},{t:'Harga jual',a:'r'},
+          {t:'HPP',a:'r'},{t:'Status'},{t:'',a:'r'}],saring(rows));}
+function saring(rows){
+ const q=(document.getElementById('cari')?.value||'').toLowerCase();
+ const f=document.getElementById('filter')?.value||'Semua status';
+ return rows.filter((r,i)=>{const b=S.batch[i];
+  return (f==='Semua status'||b.status===f)&&(b.id+b.nama+b.kode).toLowerCase().includes(q);});}
+
+/* ============ TAB 2 ============ */
+function vVerifikasi(){
+ if(S.peran!=='owner')return kunciPeran('Verifikasi barang masuk hanya dapat dilakukan Owner atau Manajer.');
+ const list=S.batch.filter(b=>b.status==='Menunggu verifikasi');
+ document.getElementById('isi').innerHTML=
+  judul('Verifikasi Barang Masuk',
+   'Catatan dari admin gudang menunggu diperiksa. Jumlah masih dapat diperbaiki, dan setelah disetujui <b>stok masuk sehingga barang langsung dapat dijual.</b>')
+  +tabel([{t:'Nomor'},{t:'Produk'},{t:'Dicatat oleh'},{t:'Varian',a:'c'},{t:'Jumlah',a:'c'},
+          {t:'Harga jual',a:'r'},{t:'',a:'r'}],
+   list.map(b=>[`<div class="font-semibold">${b.id}</div><div class="text-xs text-slate-500">${b.tgl}</div>`,
+    `${b.nama}<div class="text-xs text-slate-500">${b.kode}</div>`,b.oleh,b.baris.length,`<b>${jml(b)}</b>`,
+    rp(b.jual),btn('Periksa',`periksa('${b.id}')`,'pri')]),
+   'Tidak ada catatan yang menunggu diperiksa.');}
+
+function periksa(id){
+ const b=S.batch.find(x=>x.id===id);
+ buka('Periksa barang masuk',`${b.id} · ${b.nama} · dicatat oleh ${b.oleh}, ${b.tgl}`,`
+  <div class="border border-slate-200 rounded-lg overflow-hidden">
+   <table class="w-full text-sm"><thead class="bg-slate-50 text-xs uppercase text-slate-500">
+    <tr><th class="text-left px-4 py-2">Warna</th><th class="text-left px-4 py-2">Ukuran</th>
+    <th class="text-center px-4 py-2">Jumlah dicatat</th></tr></thead>
+   <tbody>${b.baris.map((x,i)=>`<tr class="border-t border-slate-100">
+    <td class="px-4 py-2 font-semibold">${x.w}</td><td class="px-4 py-2">${x.u}</td>
+    <td class="px-4 py-1.5 text-center"><input type="number" min="0" value="${x.q}"
+      onchange="ubahQty('${b.id}',${i},this.value)" class="w-20 px-2 py-1 rounded border text-center"></td></tr>`).join('')}
+    <tr class="border-t border-slate-200 bg-slate-50"><td colspan="2" class="px-4 py-2 font-semibold">Total</td>
+     <td class="px-4 py-2 text-center font-semibold" id="totPeriksa">${jml(b)} potong</td></tr></tbody></table></div>
+  ${info('Perbaiki langsung jumlahnya di sini bila ada yang keliru, lalu setujui. Admin gudang tidak dapat mengubahnya setelah dikirim, dan perubahan tercatat atas nama Anda.','amber')}
+  <div class="mt-4">${btn('Setujui dan masukkan stok',`setujui('${b.id}')`,'pri',false)}</div>`);}
+function ubahQty(id,i,v){const b=S.batch.find(x=>x.id===id);b.baris[i].q=+v||0;
+ document.getElementById('totPeriksa').textContent=jml(b)+' potong';}
+function setujui(id){const b=S.batch.find(x=>x.id===id);b.status='Menunggu HPP';tutup();render();
+ alert('Disetujui.\n\nStok masuk dan barang langsung dapat dijual. '+jml(b)+' label barcode siap dicetak pada tab 4.');}
+
+/* ============ TAB 3 ============ */
+function vHpp(){
+ if(S.peran!=='owner')return kunciPeran('Pengisian dan penguncian HPP hanya dapat dilakukan Owner. HPP sengaja tidak terlihat oleh peran lain.');
+ const nunggu=S.batch.filter(b=>b.status==='Menunggu HPP');
+ const sumber=S.batch.filter(b=>b.status==='Menunggu HPP'||b.status==='Terkunci');
+ const list=fHpp==='Semua'?sumber:sumber.filter(b=>b.status===fHpp);
+ const chip=(t,n)=>`<button onclick="setFilterHpp('${t}')" class="px-3 py-1.5 rounded-lg text-xs font-semibold border
+   ${fHpp===t?'bg-teal-700 text-white border-teal-700':'bg-white text-slate-600 border-slate-300 hover:border-teal-600'}">${t}
+   <span class="${fHpp===t?'text-teal-100':'text-slate-400'}">${n}</span></button>`;
+ document.getElementById('isi').innerHTML=
+  judul('Pengisian HPP',
+   'Diisi owner setelah nota diperiksa, umumnya malam hari. Pengisian memperbarui laba penjualan yang sudah terjadi pada catatan yang sama. <b>Catatan yang sudah dikunci tidak berubah lagi.</b>')
+  +(nunggu.length?`<div class="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800 mb-4">
+     ${nunggu.length} catatan belum memiliki HPP. Selama belum diisi, laporan laba masih bersifat sementara.</div>`:'')
+  +`<div class="flex flex-wrap gap-2 mb-3">
+     ${chip('Menunggu HPP',nunggu.length)}
+     ${chip('Terkunci',sumber.filter(b=>b.status==='Terkunci').length)}
+     ${chip('Semua',sumber.length)}</div>`
+  +tabel([{t:'Nomor'},{t:'Produk'},{t:'Jumlah',a:'c'},{t:'Terjual',a:'c'},{t:'Belum dihitung',a:'c'},{t:'Harga jual',a:'r'},
+          {t:'HPP',a:'r'},{t:'Status'},{t:'',a:'r'}],
+   list.map(b=>[`<div class="font-semibold">${b.id}</div><div class="text-xs text-slate-500">${b.tgl}</div>`,
+    `${b.nama}<div class="text-xs text-slate-500">${b.kode}</div>`,
+    jml(b),`<b>${b.terjual}</b>`,
+    (b.terjual-b.terhitung)?`<span class="text-amber-700 font-semibold">${b.terjual-b.terhitung}</span>`:'—',
+    rp(b.jual),
+    b.hpp?rp(b.hpp):'<span class="text-xs font-semibold text-amber-700">belum diisi</span>',
+    pill(b.status),
+    b.status==='Menunggu HPP'?btn('Isi HPP',`isiHpp('${b.id}')`,'pri')
+     :btn('Buka kunci',`bukaKunci('${b.id}')`,'gh')]),
+   'Tidak ada catatan pada penyaring ini.')
+  +`<div class="text-xs text-slate-500 mt-3">Catatan terkunci tetap ditampilkan agar riwayat HPP mudah ditelusuri. Membuka kunci akan tercatat pada jejak aktivitas.</div>`;}
+function setFilterHpp(t){fHpp=t;render();}
+
+function isiHpp(id){
+ const b=S.batch.find(x=>x.id===id);
+ const ulang=b.pernahKunci;
+ buka(ulang?'Perbaiki HPP dan kunci kembali':'Isi HPP dan kunci catatan',
+  `${b.id} · ${b.nama} · ${jml(b)} potong`,`
+  <table class="w-full text-sm border border-slate-200 rounded-lg overflow-hidden"><tbody>
+   <tr class="border-b border-slate-100"><td class="px-4 py-2.5">Harga jual</td><td class="px-4 py-2.5 text-right">${rp(b.jual)}</td></tr>
+   <tr class="border-b border-slate-100"><td class="px-4 py-2.5">Sudah terjual dari catatan ini</td>
+    <td class="px-4 py-2.5 text-right font-semibold">${b.terjual} potong</td></tr>
+   <tr class="border-b border-slate-100"><td class="px-4 py-2.5">Penjualan yang sudah dihitung dengan HPP lama</td>
+    <td class="px-4 py-2.5 text-right font-semibold">${b.terhitung} potong</td></tr>
+   <tr><td class="px-4 py-2.5">Penjualan yang labanya belum dihitung</td>
+    <td class="px-4 py-2.5 text-right font-semibold ${b.terjual-b.terhitung?'text-amber-700':''}">${b.terjual-b.terhitung} potong</td></tr></tbody></table>
+  <div class="mt-4 max-w-xs"><label class="block text-xs font-semibold text-slate-500 mb-1">HPP per potong</label>
+   <input id="inHpp" type="number" placeholder="72000" class="w-full px-3 py-2 rounded-lg border text-sm"></div>
+  ${info(ulang
+    ? `HPP baru hanya berlaku untuk <b>${b.terjual-b.terhitung} penjualan yang labanya belum dihitung</b> dan untuk penjualan berikutnya. <b>${b.terhitung} penjualan yang sudah dihitung dengan HPP lama tidak berubah</b>, sehingga laporan periode lalu tetap utuh.`
+    : `Setelah diisi, laba <b>${b.terjual} penjualan yang sudah terjadi</b> pada catatan ini ikut dihitung. Setelah dikunci, penjualan tersebut tidak berubah lagi meski HPP diperbaiki kemudian.`)}
+  <div class="mt-4">${btn('Simpan dan kunci catatan',`kunci('${b.id}')`,'pri',false)}</div>`);}
+function kunci(id){const n=+document.getElementById('inHpp').value;
+ if(!n){alert('Isi dulu HPP-nya.');return;}
+ const b=S.batch.find(x=>x.id===id);
+ const baru=b.terjual-b.terhitung;
+ b.hpp=n;b.status='Terkunci';b.pernahKunci=true;b.terhitung=b.terjual;
+ tutup();render();
+ alert('HPP tersimpan dan catatan dikunci.\n\n'+baru+' penjualan yang labanya belum dihitung kini memakai HPP '+rp(n)+
+  '.\nPenjualan yang sudah dihitung sebelumnya tidak berubah.');}
+function bukaKunci(id){
+ const b=S.batch.find(x=>x.id===id);
+ buka('Buka kunci catatan',`${b.id} · ${b.nama} · HPP sekarang ${rp(b.hpp)}`,`
+  <p class="text-sm text-slate-600">Membuka kunci memungkinkan HPP diperbaiki, misalnya bila ada biaya tambahan atau nota terbaca keliru.</p>
+  <table class="w-full text-sm border border-slate-200 rounded-lg overflow-hidden mt-3"><tbody>
+   <tr class="border-b border-slate-100"><td class="px-4 py-2.5">Penjualan yang sudah dihitung dengan HPP ini</td>
+    <td class="px-4 py-2.5 text-right font-semibold">${b.terhitung} potong</td></tr>
+   <tr><td class="px-4 py-2.5">Sisa stok yang belum terjual</td>
+    <td class="px-4 py-2.5 text-right font-semibold">${jml(b)-b.terjual} potong</td></tr></tbody></table>
+  ${info(`<b>Penjualan yang sudah dihitung tidak akan berubah.</b> HPP baru hanya berlaku untuk penjualan berikutnya, sehingga laporan laba periode lalu tetap utuh.`,'amber')}
+  <div class="flex flex-wrap gap-2 mt-4">
+   ${btn('Ya, buka kunci',`lanjutBuka('${b.id}')`,'pri',false)}
+   ${btn('Batal','tutup()','gh',false)}</div>`);}
+function lanjutBuka(id){const b=S.batch.find(x=>x.id===id);b.status='Menunggu HPP';tutup();render();}
+
+/* ============ TAB 4 ============ */
+function vBarcode(){
+ const siap=S.batch.filter(b=>b.status==='Menunggu HPP'||b.status==='Terkunci');
+ document.getElementById('isi').innerHTML=
+  judul('Cetak Barcode',
+   'Dicetak massal sesuai jumlah tiap varian, sekali tekan. Pengaturan printer tersimpan, tidak perlu diatur ulang setiap mencetak.')
+  +tabel([{t:'Nomor'},{t:'Produk'},{t:'Varian',a:'c'},{t:'Label',a:'c'},{t:'Status'},{t:'',a:'r'}],
+   siap.map(b=>[`<b>${b.id}</b>`,`${b.nama}<div class="text-xs text-slate-500">${b.kode}</div>`,
+    b.baris.length,`<b>${jml(b)}</b>`,pill(b.status),btn('Lihat dan cetak',`labelnya('${b.id}')`,'pri')]),
+   'Belum ada catatan yang disetujui.');}
+function labelnya(id){
+ const b=S.batch.find(x=>x.id===id);
+ let html='';
+ b.baris.forEach(r=>{for(let i=0;i<r.q;i++){
+  const sku=`${b.kode}-${r.w.slice(0,3).toUpperCase()}-${r.u}`;
+  html+=`<div class="border border-slate-300 rounded p-2 text-center">
+   <div class="text-[10px] text-slate-500 truncate">${b.nama}</div>
+   <div class="text-xs font-semibold">${r.w} · ${r.u}</div>
+   <div class="my-1 flex justify-center gap-px h-7 items-end">
+    ${Array.from({length:22},(_,k)=>`<span class="bg-slate-800" style="width:${k%4?1:2}px;height:${k%3?100:80}%"></span>`).join('')}</div>
+   <div class="text-[10px] tracking-wider">${sku}</div>
+   <div class="text-xs font-bold">${rp(b.jual)}</div></div>`;}});
+ buka('Pratinjau label',`${b.id} · ${b.nama} · ${jml(b)} label`,
+  `<div id="printArea"><div class="grid grid-cols-2 sm:grid-cols-4 gap-2">${html}</div></div>
+   <div class="mt-4 no-print">${btn('Cetak sekarang','window.print()','pri',false)}</div>
+   ${info('Seluruh label tercetak sekali tekan, sesuai jumlah tiap varian pada catatan ini.')}`);}
+
+/* ============ FORM CATAT ============ */
+function buatBaru(){draf={kode:'',nama:'',jual:'',baris:[]};formDraf();}
+function lanjutDraf(id){const b=S.batch.find(x=>x.id===id);
+ draf={id:b.id,kode:b.kode,nama:b.nama,jual:b.jual||'',baris:b.baris.map(x=>({...x}))};formDraf();}
+function formDraf(){
+ buka('Catat Barang Masuk','Tambahkan warna, lalu isi jumlah per ukuran',`
+  <div class="grid sm:grid-cols-3 gap-3">
+   <div><label class="block text-xs font-semibold text-slate-500 mb-1">Kode produk</label>
+    <input id="f-kode" value="${draf.kode||''}" placeholder="Kosongkan agar dibuat sistem" class="w-full px-3 py-2 rounded-lg border text-sm"></div>
+   <div><label class="block text-xs font-semibold text-slate-500 mb-1">Nama produk</label>
+    <input id="f-nama" value="${draf.nama||''}" placeholder="Blouse Katun Rayon" class="w-full px-3 py-2 rounded-lg border text-sm"></div>
+   <div><label class="block text-xs font-semibold text-slate-500 mb-1">Harga jual</label>
+    <input id="f-jual" type="number" value="${draf.jual||''}" placeholder="98000" class="w-full px-3 py-2 rounded-lg border text-sm"></div>
+  </div>
+  ${info('<b>HPP tidak diisi di sini.</b> Barang dapat langsung dijual setelah disetujui, dan HPP diisi owner kemudian pada tab 3.','amber')}
+  <div class="flex flex-wrap items-end gap-2 mt-4">
+   <div><label class="block text-xs font-semibold text-slate-500 mb-1">Tambah warna</label>
+    <select id="pilihWarna" class="px-3 py-2 rounded-lg border text-sm w-48"></select></div>
+   ${btn('+ Tambah baris','tambahWarna()','gh',false)}
+   <span class="text-slate-300 px-1">|</span>
+   ${btn('+ Warna baru','formWarnaBaru()','gh',false)}
+  </div>
+  <div id="warnaBaru" class="hidden mt-3 bg-slate-50 border border-slate-200 rounded-lg p-3">
+   <label class="block text-xs font-semibold text-slate-500 mb-1">Nama warna baru</label>
+   <div class="flex flex-wrap gap-2">
+    <input id="namaWarnaBaru" placeholder="Contoh: Sage Green" class="px-3 py-2 rounded-lg border text-sm w-56"
+      onkeydown="if(event.key==='Enter'){event.preventDefault();simpanWarnaBaru()}">
+    ${btn('Simpan dan pakai','simpanWarnaBaru()','pri',false)}
+    ${btn('Batal','batalWarnaBaru()','gh',false)}
+   </div>
+   <p class="text-xs text-slate-500 mt-2">Warna baru langsung tersimpan ke daftar warna, sehingga admin lain tinggal memilihnya lain kali tanpa mengetik ulang.</p>
+  </div>
+  <div id="gridWarna" class="mt-3"></div>
+  <div class="flex flex-wrap items-center justify-between gap-3 mt-4 pt-4 border-t border-slate-200">
+   <div class="text-sm">Total: <b id="f-total">0</b> potong, <b id="f-varian">0</b> varian</div>
+   <div class="flex gap-2">${btn('Simpan draf','simpanDraf()','gh',false)}${btn('Kirim untuk diperiksa','kirim()','pri',false)}</div>
+  </div>`);
+ isiPilihan();gridWarna();}
+function isiPilihan(){
+ const dipakai=draf.baris.map(b=>b.w);
+ const sisa=WARNA.filter(w=>!dipakai.includes(w));
+ document.getElementById('pilihWarna').innerHTML=sisa.length?sisa.map(w=>`<option>${w}</option>`).join('')
+  :'<option disabled>Semua warna sudah dipakai, buat warna baru</option>';}
+function tambahWarna(){
+ const w=document.getElementById('pilihWarna').value;
+ if(!w||draf.baris.some(b=>b.w===w))return;
+ pakaiWarna(w);}
+function formWarnaBaru(){
+ const k=document.getElementById('warnaBaru');k.classList.remove('hidden');
+ const i=document.getElementById('namaWarnaBaru');i.value='';i.focus();}
+function batalWarnaBaru(){document.getElementById('warnaBaru').classList.add('hidden');}
+function simpanWarnaBaru(){
+ const nama=document.getElementById('namaWarnaBaru').value.trim();
+ if(!nama){alert('Isi dulu nama warnanya.');return;}
+ const ada=WARNA.find(w=>w.toLowerCase()===nama.toLowerCase());
+ if(ada){
+  if(draf.baris.some(b=>b.w===ada)){alert('Warna "'+ada+'" sudah ada di daftar dan sudah dipakai pada catatan ini.');return;}
+  alert('Warna "'+ada+'" sudah ada di daftar warna, jadi langsung dipakai tanpa dibuat ulang.');
+  pakaiWarna(ada);return;}
+ const rapi=nama.replace(/\s+/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
+ WARNA.push(rapi);WARNA.sort();
+ pakaiWarna(rapi);
+ alert('Warna "'+rapi+'" ditambahkan ke daftar warna, dan langsung dipakai pada catatan ini.');}
+function pakaiWarna(w){
+ UKURAN.forEach(u=>draf.baris.push({w,u,q:0}));
+ batalWarnaBaru();isiPilihan();gridWarna();}
+function hapusWarna(w){draf.baris=draf.baris.filter(b=>b.w!==w);isiPilihan();gridWarna();}
+function gridWarna(){
+ const warna=[...new Set(draf.baris.map(b=>b.w))];
+ document.getElementById('gridWarna').innerHTML=warna.length?
+  `<div class="border border-slate-200 rounded-lg overflow-x-auto"><table class="w-full text-sm">
+   <thead class="bg-slate-50 text-xs uppercase text-slate-500"><tr><th class="text-left px-3 py-2">Warna</th>
+   ${UKURAN.map(u=>`<th class="px-3 py-2 text-center">${u}</th>`).join('')}
+   <th class="px-3 py-2 text-center">Total</th><th class="px-2 py-2"></th></tr></thead>
+   <tbody>${warna.map(w=>`<tr class="border-t border-slate-100">
+    <td class="px-3 py-2 font-semibold">${w}</td>
+    ${UKURAN.map(u=>{const i=draf.baris.findIndex(b=>b.w===w&&b.u===u);
+     return `<td class="px-2 py-1.5 text-center"><input type="number" min="0" value="${draf.baris[i].q||''}"
+      oninput="setQ(${i},this.value)" class="w-16 px-2 py-1 rounded border text-center"></td>`}).join('')}
+    <td class="px-3 py-2 text-center font-semibold" data-tot="${w}">—</td>
+    <td class="px-2 py-2 text-right"><button onclick="hapusWarna('${w}')" class="text-slate-400 hover:text-rose-600 text-lg leading-none">&times;</button></td>
+   </tr>`).join('')}</tbody></table></div>`
+  :`<div class="border border-dashed border-slate-300 rounded-lg py-8 text-center text-slate-400 text-sm">
+     Belum ada warna. Pilih dari daftar lalu tekan Tambah baris, atau buat warna baru bila belum ada.</div>`;
+ hitung();}
+function setQ(i,v){draf.baris[i].q=+v||0;hitung();}
+function hitung(){
+ [...new Set(draf.baris.map(b=>b.w))].forEach(w=>{
+  const n=draf.baris.filter(b=>b.w===w).reduce((a,b)=>a+b.q,0);
+  const el=document.querySelector(`[data-tot="${w}"]`);if(el)el.textContent=n||'—';});
+ const isi=draf.baris.filter(b=>b.q>0);
+ document.getElementById('f-total').textContent=isi.reduce((a,b)=>a+b.q,0);
+ document.getElementById('f-varian').textContent=isi.length;}
+function simpanKe(status){
+ const baris=draf.baris.filter(b=>b.q>0);
+ if(!baris.length){alert('Isi dulu jumlah minimal satu varian.');return false;}
+ const data={kode:document.getElementById('f-kode').value,nama:document.getElementById('f-nama').value||'Produk baru',
+  jual:+document.getElementById('f-jual').value||0,baris,status};
+ if(draf.id){const b=S.batch.find(x=>x.id===draf.id);Object.assign(b,data,{kode:data.kode||b.kode});}
+ else{const id='BM-'+String(Math.floor(Math.random()*9000)+1000);
+  S.batch.unshift({id,kode:data.kode||'AUTO-'+id.slice(-3),nama:data.nama,tgl:'5 Okt 2026, 15.40',oleh:'Dina',
+   status,jual:data.jual,hpp:null,terjual:0,baris});}
+ tutup();render();return true;}
+function simpanDraf(){if(simpanKe('Draf'))alert('Tersimpan sebagai draf. Dapat dilanjutkan saat karung berikutnya dibongkar.');}
+function kirim(){if(simpanKe('Menunggu verifikasi'))
+ alert('Rekap terkirim. Owner dan manajer menerima pemberitahuan untuk memeriksa.');}
+
+/* ============ LIHAT ============ */
+function lihat(id){const b=S.batch.find(x=>x.id===id);
+ buka('Rincian catatan',`${b.id} · ${b.tgl} · oleh ${b.oleh}`,`
+  <table class="w-full text-sm border border-slate-200 rounded-lg overflow-hidden mb-4"><tbody>
+   <tr class="border-b border-slate-100"><td class="px-4 py-2.5">Produk</td><td class="px-4 py-2.5 text-right font-semibold">${b.nama}</td></tr>
+   <tr class="border-b border-slate-100"><td class="px-4 py-2.5">Kode</td><td class="px-4 py-2.5 text-right">${b.kode}</td></tr>
+   <tr class="border-b border-slate-100"><td class="px-4 py-2.5">Harga jual</td><td class="px-4 py-2.5 text-right">${b.jual?rp(b.jual):'—'}</td></tr>
+   <tr><td class="px-4 py-2.5">HPP</td><td class="px-4 py-2.5 text-right">${b.hpp?rp(b.hpp)+' · terkunci':
+    (S.peran==='owner'?'<span class="text-amber-700 text-xs font-semibold">belum diisi</span>':'<span class="text-slate-400 text-xs">tersembunyi</span>')}</td></tr>
+  </tbody></table>
+  <div class="border border-slate-200 rounded-lg overflow-hidden"><table class="w-full text-sm">
+   <thead class="bg-slate-50 text-xs uppercase text-slate-500"><tr><th class="text-left px-4 py-2">Warna</th>
+    <th class="text-left px-4 py-2">Ukuran</th><th class="text-center px-4 py-2">Jumlah</th></tr></thead>
+   <tbody>${b.baris.map(x=>`<tr class="border-t border-slate-100"><td class="px-4 py-2 font-semibold">${x.w}</td>
+    <td class="px-4 py-2">${x.u}</td><td class="px-4 py-2 text-center">${x.q}</td></tr>`).join('')}
+    <tr class="border-t border-slate-200 bg-slate-50"><td colspan="2" class="px-4 py-2 font-semibold">Total</td>
+     <td class="px-4 py-2 text-center font-semibold">${jml(b)} potong</td></tr></tbody></table></div>`);}
+
+/* ============ UMUM ============ */
+function kunciPeran(pesan){
+ document.getElementById('isi').innerHTML=`<div class="bg-white rounded-xl border border-dashed border-slate-300 py-16 text-center">
+  <div class="font-semibold mb-1">Tidak tersedia untuk peran ini</div>
+  <div class="text-sm text-slate-500 max-w-md mx-auto">${pesan}</div>
+  <div class="mt-4">${btn('Lihat sebagai Owner',"gantiPeran('owner')",'gh',false)}</div></div>`;}
+
+/* ============ ALUR 2 — KEEP & DP ============ */
+function vStok(){
+ document.getElementById('isi').innerHTML=
+  judul('Stok Tersedia',
+   'Angka <b>Tersedia</b> adalah stok fisik dikurangi yang sedang di-keep. Sama untuk semua pengguna, termasuk kasir toko, sehingga barang yang sudah di-DP tidak terjual ke orang lain.')
+  +tabel([{t:'Produk'},{t:'Varian'},{t:'Fisik',a:'c'},{t:'Di-keep',a:'c'},{t:'Tersedia',a:'c'},
+          {t:'Harga jual',a:'r'},{t:'',a:'r'}],
+   S.stok.map(v=>{const k=diKeep(v.kode,v.w,v.u),t=v.fisik-k;
+    return [`${v.nama}<div class="text-xs text-slate-500">${v.kode}</div>`,`${v.w} · ${v.u}`,v.fisik,
+     k?`<span class="text-amber-700 font-semibold">${k}</span>`:'—',
+     `<b class="${t>0?'text-emerald-700':'text-rose-600'}">${t}</b>`,rp(v.jual),
+     t>0?btn('Keep',`formKeep('${v.kode}','${v.w}','${v.u}')`,'pri'):''];}));}
+
+function formKeep(kode,w,u){
+ const v=S.stok.find(x=>x.kode===kode&&x.w===w&&x.u===u);
+ const t=v.fisik-diKeep(kode,w,u);
+ buka('Keep stok',`${v.nama} · ${w} · ${u} · tersedia ${t} potong`,`
+  <div class="grid sm:grid-cols-2 gap-3">
+   <div><label class="block text-xs font-semibold text-slate-500 mb-1">Jumlah di-keep</label>
+    <input id="k-q" type="number" value="1" min="1" max="${t}" class="w-full px-3 py-2 rounded-lg border text-sm"></div>
+   <div><label class="block text-xs font-semibold text-slate-500 mb-1">Nama pelanggan</label>
+    <input id="k-pel" placeholder="Bu Ani" class="w-full px-3 py-2 rounded-lg border text-sm"></div>
+   <div><label class="block text-xs font-semibold text-slate-500 mb-1">Jenis pelanggan</label>
+    <select id="k-jenis" class="w-full px-3 py-2 rounded-lg border text-sm"><option>Umum</option><option>Reseller</option></select></div>
+   <div><label class="block text-xs font-semibold text-slate-500 mb-1">Jumlah DP</label>
+    <input id="k-dp" type="number" placeholder="100000" class="w-full px-3 py-2 rounded-lg border text-sm"></div>
+   <div><label class="block text-xs font-semibold text-slate-500 mb-1">Nomor referensi transfer</label>
+    <input id="k-ref" placeholder="BCA/2410/88123" class="w-full px-3 py-2 rounded-lg border text-sm"></div>
+   <div><label class="block text-xs font-semibold text-slate-500 mb-1">Bukti transfer</label>
+    <div id="k-up" onclick="unggahBukti()" class="px-3 py-2 rounded-lg border border-dashed border-slate-300 text-sm text-slate-400 text-center cursor-pointer">Ketuk untuk mengunggah</div></div>
+  </div>
+  ${info('Keep berlaku 1x24 jam, lalu terlepas sendiri. Selama di-keep, stok tidak dapat dijual pihak lain. Berlaku siapa lebih cepat dia dapat.')}
+  <div class="mt-4">${btn('Keep sekarang',`simpanKeep('${kode}','${w}','${u}',${t})`,'pri',false)}</div>`);}
+function unggahBukti(){const e=document.getElementById('k-up');
+ e.textContent='bukti-transfer-2410.jpg · terunggah';e.className='px-3 py-2 rounded-lg border border-emerald-300 bg-emerald-50 text-sm text-emerald-700 text-center';}
+function simpanKeep(kode,w,u,maks){
+ const q=+document.getElementById('k-q').value||0, pel=document.getElementById('k-pel').value.trim();
+ if(!q||q>maks){alert('Jumlah tidak boleh kosong atau melebihi stok tersedia.');return;}
+ if(!pel){alert('Isi nama pelanggannya.');return;}
+ S.keep.unshift({id:'K-'+Math.floor(Math.random()*900+100),kode,w,u,q,admin:PERAN[S.peran],pel,
+  jenis:document.getElementById('k-jenis').value,dp:+document.getElementById('k-dp').value||0,
+  ref:document.getElementById('k-ref').value||'—',bukti:'bukti-transfer-2410.jpg',lepas:'6 Okt 2026, 16.10'});
+ tutup();tab='keep';render();
+ alert('Stok di-keep. Pengguna lain kini melihat sisa yang benar-benar tersedia.');}
+
+function vKeep(){
+ document.getElementById('isi').innerHTML=
+  judul('Keep Berjalan','Terlihat oleh semua pengguna, lengkap dengan nama admin yang meng-keep dan kapan akan terlepas.')
+  +tabel([{t:'Produk'},{t:'Qty',a:'c'},{t:'Pelanggan'},{t:'Admin'},{t:'DP',a:'r'},{t:'Terlepas'},{t:'',a:'r'}],
+   S.keep.map(k=>[`${S.stok.find(v=>v.kode===k.kode&&v.w===k.w&&v.u===k.u)?.nama||k.kode}
+     <div class="text-xs text-slate-500">${k.w} · ${k.u}</div>`,`<b>${k.q}</b>`,
+    `${k.pel}<div class="text-xs"><span class="px-1.5 py-0.5 rounded ${k.jenis==='Reseller'?'bg-teal-50 text-teal-700':'bg-slate-100 text-slate-500'}">${k.jenis}</span></div>`,
+    k.admin,rp(k.dp),k.lepas,
+    (S.peran==='owner'||k.admin===PERAN[S.peran])?btn('Lepas',`lepasKeep('${k.id}')`,'gh'):'<span class="text-xs text-slate-400">milik admin lain</span>']),
+   'Tidak ada stok yang sedang di-keep.')
+  +`<div class="text-xs text-slate-500 mt-3">Admin hanya dapat melepas keep miliknya sendiri. Owner dan manajer dapat melepas milik siapa pun, misalnya saat admin bersangkutan sedang tidak bertugas.</div>`;}
+function lepasKeep(id){const k=S.keep.find(x=>x.id===id);
+ buka('Lepas keep',`${k.pel} · ${k.q} potong · DP ${rp(k.dp)}`,`
+  <p class="text-sm text-slate-600">Stok akan kembali tersedia untuk semua pengguna.</p>
+  ${info(k.jenis==='Reseller'
+   ? 'Pelanggan ini <b>reseller</b>, sehingga DP-nya menempel pada namanya dan dapat dialihkan ke barang lain.'
+   : 'Pelanggan umum, sehingga DP hangus bila pesanan dibatalkan.','amber')}
+  <div class="flex flex-wrap gap-2 mt-4">${btn('Lepas keep',`lanjutLepas('${id}')`,'pri',false)}${btn('Batal','tutup()','gh',false)}</div>`);}
+function lanjutLepas(id){S.keep=S.keep.filter(k=>k.id!==id);tutup();render();}
+
+function vDp(){
+ document.getElementById('isi').innerHTML=
+  judul('DP & Pembatalan','Dicari lewat nomor referensi transfer, nama pelanggan, atau tanggal, tanpa membuka buku catatan.')
+  +`<div class="bg-white rounded-xl border border-slate-200 mb-3 px-4 py-3">
+     <input placeholder="Cari nomor referensi atau nama pelanggan" class="px-3 py-1.5 rounded-lg border text-sm w-72"></div>`
+  +tabel([{t:'Pelanggan'},{t:'Jenis'},{t:'Produk'},{t:'DP',a:'r'},{t:'Nomor referensi'},{t:'Bukti'},{t:'',a:'r'}],
+   S.keep.map(k=>[`<b>${k.pel}</b>`,
+    `<span class="px-2 py-0.5 rounded-full text-xs font-semibold ${k.jenis==='Reseller'?'bg-teal-50 text-teal-700':'bg-slate-100 text-slate-600'}">${k.jenis}</span>`,
+    `${S.stok.find(v=>v.kode===k.kode&&v.w===k.w&&v.u===k.u)?.nama||k.kode}
+     <div class="text-xs text-slate-500">${k.w} · ${k.u} · ${k.q} pcs</div>`,
+    rp(k.dp),k.ref,`<span class="text-xs text-slate-500">${k.bukti}</span>`,
+    btn('Batalkan',`batalDp('${k.id}')`,'gh')]),'Belum ada DP berjalan.')
+  +`<div class="text-xs text-slate-500 mt-3">Sistem memberi tahu bila satu bukti transfer sudah pernah dipakai, agar tidak terhitung dua kali.</div>`;}
+function batalDp(id){const k=S.keep.find(x=>x.id===id);
+ buka('Batalkan DP',`${k.pel} · ${k.jenis} · DP ${rp(k.dp)}`,
+  k.jenis==='Reseller'
+  ? `<p class="text-sm text-slate-600">Pelanggan ini reseller. DP menempel pada namanya, bukan pada barangnya, sehingga dapat dialihkan ke barang lain.</p>
+     <div class="flex flex-wrap gap-2 mt-4">
+      ${btn('Alihkan ke barang lain',`selesaiDp('${id}','alih')`,'pri',false)}
+      ${btn('Hanguskan DP',`selesaiDp('${id}','hangus')`,'dg',false)}
+      ${btn('Batal','tutup()','gh',false)}</div>`
+  : `<p class="text-sm text-slate-600">Pelanggan umum. Sesuai ketentuan toko, DP hangus bila pesanan dibatalkan.</p>
+     ${info('Keep atas nama pelanggan ini juga akan dilepas, sehingga stok kembali tersedia.','amber')}
+     <div class="flex flex-wrap gap-2 mt-4">
+      ${btn('Hanguskan DP',`selesaiDp('${id}','hangus')`,'dg',false)}${btn('Batal','tutup()','gh',false)}</div>`);}
+function selesaiDp(id,cara){const k=S.keep.find(x=>x.id===id);
+ S.keep=S.keep.filter(x=>x.id!==id);tutup();render();
+ alert(cara==='alih'
+  ? 'DP '+rp(k.dp)+' dialihkan ke nama '+k.pel+', dan dapat dipakai untuk barang lain.'
+  : 'DP '+rp(k.dp)+' dihanguskan. Stok kembali tersedia.');}
+
+/* ============ ALUR 3 — TUTUP HARI ============ */
+function vKeluar(){
+ const t=S.kas.keluar.reduce((a,b)=>a+b.n,0);
+ document.getElementById('isi').innerHTML=
+  judul('Pengeluaran Kas',
+   'Ongkos kirim dibayar tunai dari laci kasir, padahal uangnya masuk lewat transfer ke admin online. Pencatatan atas nama admin membuat selisih kas terlihat asalnya.',
+   btn('+ Catat pengeluaran','formKeluar()','pri',false))
+  +tabel([{t:'Waktu'},{t:'Jenis'},{t:'Keterangan'},{t:'Atas nama admin'},{t:'Bukti'},{t:'Jumlah',a:'r'}],
+   S.kas.keluar.map(k=>[k.jam,k.jenis,k.ket,k.atas,`<span class="text-xs text-slate-500">${k.bukti}</span>`,'− '+rp(k.n)])
+   .concat([['','','','','<b>Total hari ini</b>','<b>− '+rp(t)+'</b>']]));}
+function formKeluar(){
+ const opsi=S.kas.admin.map(a=>`<option>${a.nama}</option>`).join('');
+ buka('Catat pengeluaran kas','Diambil dari laci kasir toko',`
+  <div class="grid sm:grid-cols-2 gap-3">
+   <div><label class="block text-xs font-semibold text-slate-500 mb-1">Jenis pengeluaran</label>
+    <select id="x-jenis" class="w-full px-3 py-2 rounded-lg border text-sm"><option>Ongkos kirim</option><option>Parkir</option><option>Konsumsi</option></select></div>
+   <div><label class="block text-xs font-semibold text-slate-500 mb-1">Jumlah</label>
+    <input id="x-n" type="number" placeholder="20000" class="w-full px-3 py-2 rounded-lg border text-sm"></div>
+   <div><label class="block text-xs font-semibold text-slate-500 mb-1">Keterangan</label>
+    <input id="x-ket" placeholder="Gojek ke Bu Ani" class="w-full px-3 py-2 rounded-lg border text-sm"></div>
+   <div><label class="block text-xs font-semibold text-slate-500 mb-1">Atas nama admin</label>
+    <select id="x-atas" class="w-full px-3 py-2 rounded-lg border text-sm">${opsi}</select></div>
+  </div>
+  ${info('Pengeluaran ini mengurangi kas laci, tetapi tercatat atas nama admin yang pesanannya dikirim. Saat tutup hari, selisihnya langsung terlihat asalnya.')}
+  <div class="mt-4">${btn('Catat pengeluaran','simpanKeluar()','pri',false)}</div>`);}
+function simpanKeluar(){
+ const n=+document.getElementById('x-n').value||0;
+ if(!n){alert('Isi dulu jumlahnya.');return;}
+ const atas=document.getElementById('x-atas').value;
+ S.kas.keluar.unshift({jam:'16.30',jenis:document.getElementById('x-jenis').value,
+  ket:document.getElementById('x-ket').value||'—',atas,bukti:'foto-ongkir-03.jpg',n});
+ const a=S.kas.admin.find(x=>x.nama===atas);if(a)a.ongkir+=n;
+ tutup();render();}
+
+function vTutup(){
+ const t=f=>S.kas.admin.reduce((a,b)=>a+b[f],0);
+ const seharusnya=S.kas.awal+t('tunai')-t('ongkir');
+ document.getElementById('isi').innerHTML=
+  judul('Rekap & Tutup Hari','Menggantikan rekap manual 1,5 sampai 2 jam setiap malam yang selama ini memakai Excel dan buku transfer.')
+  +tabel([{t:'Admin'},{t:'Tunai',a:'r'},{t:'BRI',a:'r'},{t:'BCA',a:'r'},{t:'QRIS',a:'r'},
+          {t:'Ongkir',a:'r'},{t:'Pegang tunai',a:'c'}],
+   S.kas.admin.map(a=>[`<b>${a.nama}</b>`,a.tunai?rp(a.tunai):'—',a.bri?rp(a.bri):'—',a.bca?rp(a.bca):'—',
+    a.qris?rp(a.qris):'—',a.ongkir?'− '+rp(a.ongkir):'—',
+    a.tunai?'<span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700">Ya</span>'
+           :'<span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-500">Tidak</span>'])
+   .concat([['<b>Total</b>','<b>'+rp(t('tunai'))+'</b>','<b>'+rp(t('bri'))+'</b>','<b>'+rp(t('bca'))+'</b>',
+             '<b>'+rp(t('qris'))+'</b>','<b>− '+rp(t('ongkir'))+'</b>','']]))
+  +`<div class="text-xs text-slate-500 mt-3 mb-5">Admin online tidak memegang uang tunai, tetapi ongkos kirim pesanannya dibayar dari laci kasir. Kolom terakhir membuat hal itu terlihat jelas.</div>`
+  +`<h2 class="text-base font-semibold mb-3">Pencocokan kas laci</h2>`
+  +tabel([{t:'Keterangan'},{t:'Jumlah',a:'r'}],[
+    ['Saldo awal laci',rp(S.kas.awal)],
+    ['Penerimaan tunai kasir toko','+ '+rp(t('tunai'))],
+    ['Pengeluaran ongkir admin online','<span class="text-rose-600">− '+rp(t('ongkir'))+'</span>'],
+    ['<b>Seharusnya ada di laci</b>','<b>'+rp(seharusnya)+'</b>']])
+  +`<div class="bg-white rounded-xl border border-slate-200 p-4 mt-4">
+     <label class="block text-xs font-semibold text-slate-500 mb-1">Hasil hitung fisik laci</label>
+     <div class="flex flex-wrap gap-2 items-center">
+      <input id="hitungFisik" type="number" placeholder="${seharusnya}" class="px-3 py-2 rounded-lg border text-sm w-48">
+      ${btn('Cocokkan',`cocokkan(${seharusnya})`,'gh',false)}
+      ${btn('Tutup hari','alert(\'Hari ditutup. Laporan tersimpan dan dapat diunduh.\')','pri',false)}
+     </div><div id="hasilCocok" class="mt-3"></div></div>`;}
+function cocokkan(seharusnya){
+ const n=+document.getElementById('hitungFisik').value||0;
+ const selisih=n-seharusnya;
+ document.getElementById('hasilCocok').innerHTML=!n?'' : selisih===0
+  ? `<div class="bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-2.5 text-sm text-emerald-800">Kas cocok. Tidak ada selisih.</div>`
+  : `<div class="bg-rose-50 border border-rose-200 rounded-lg px-4 py-2.5 text-sm text-rose-800">
+      Selisih ${rp(Math.abs(selisih))} ${selisih>0?'lebih':'kurang'} dari yang seharusnya. Periksa kembali pengeluaran yang belum tercatat.</div>`;}
+function buka(j,s,isi){document.getElementById('mJudul').textContent=j;
+ document.getElementById('mSub').textContent=s;document.getElementById('mIsi').innerHTML=isi;
+ document.getElementById('modal').classList.remove('hidden');}
+function tutup(){document.getElementById('modal').classList.add('hidden');}
+function ke(t){tab=t;render();window.scrollTo(0,0);}
+function gantiPeran(p){S.peran=p;tutup();render();}
+function render(){
+ document.getElementById('swPeran').innerHTML=Object.entries(PERAN).map(([k,v])=>
+  `<button onclick="gantiPeran('${k}')" class="px-3 py-1 rounded-md text-xs font-bold
+   ${k===S.peran?'bg-teal-600 text-white':'text-slate-300 hover:text-white'}">${v.split(' · ')[1]}</button>`).join('');
+ document.getElementById('namaUser').textContent=PERAN[S.peran];
+ document.getElementById('catatPeran').textContent={
+  gudang:'Admin gudang tidak dapat melihat HPP maupun menyetujui catatan',
+  owner:'Owner dapat memeriksa, mengisi HPP, dan mengunci catatan',
+  jual:'Admin penjualan dapat melihat stok dan meng-keep, tetapi tidak menyelesaikan transaksi',
+  kasir:'Kasir melihat stok tersedia yang sudah dikurangi keep'}[S.peran];
+ document.getElementById('alur').innerHTML=ALUR.map(a=>
+  `<button onclick="keAlur('${a.k}')" class="px-3.5 py-1.5 rounded-lg text-xs font-bold border
+    ${a.k===alur?'bg-slate-800 text-white border-slate-800':'bg-white text-slate-600 border-slate-300 hover:border-slate-500'}">${a.l}</button>`).join('');
+ const TAB=ALUR.find(a=>a.k===alur).tab;
+ document.getElementById('tabs').innerHTML=TAB.map(([k,l])=>{
+  const aktif=k===tab, boleh=!bisa[k]||bisa[k].includes(S.peran);
+  return `<button onclick="ke('${k}')" class="px-4 py-2.5 border-b-2 font-medium whitespace-nowrap
+   ${aktif?'border-teal-700 text-teal-700':'border-transparent '+(boleh?'text-slate-500 hover:text-slate-800':'text-slate-300')}">${l}</button>`;}).join('');
+ ({masuk:vMasuk,verifikasi:vVerifikasi,hpp:vHpp,barcode:vBarcode,
+    stok:vStok,keep:vKeep,dp:vDp,keluar:vKeluar,tutup:vTutup}[tab])();}
+function keAlur(k){alur=k;tab=ALUR.find(a=>a.k===k).tab[0][0];
+ const b=bisa[tab];if(b&&!b.includes(S.peran))S.peran=b[0];
+ render();window.scrollTo(0,0);}
+render();
+</script>
+</body>
+</html>
